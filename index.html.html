@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Havlena-Odeh Material Balance Dashboard | PNGE4412 HW2 Q2</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- SheetJS (XLSX) for Excel Parsing & Generation -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <!-- Plotly.js for Interactive Scientific Engineering Plots -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom subtle scrollbars for tables */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation & Header -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 shadow-lg sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/40 flex items-center justify-center text-teal-400 shrink-0">
+          <i class="fa-solid fa-oil-well text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">Havlena–Odeh Material Balance Console</h1>
+            <span id="header-badge" class="px-2 py-0.5 text-[11px] font-mono font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-full">PNGE4412 • HW2 Q1 &amp; Q2</span>
+          </div>
+          <p class="text-xs text-slate-400">Straight-Line MBE Solver for STOIIP (<span class="font-mono text-slate-300">N</span>), Gas-Cap Ratio (<span class="font-mono text-slate-300">m</span>), and Initial Gas-Cap Gas (<span class="font-mono text-slate-300">G</span>)</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs & Quick Actions -->
+      <div class="flex flex-wrap items-center gap-2">
+        <nav class="flex bg-slate-800 p-1 rounded-xl border border-slate-700" role="tablist">
+          <button id="tab-dashboard" onclick="switchTab('dashboard')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 text-white shadow-sm transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-chart-line"></i> Dashboard & Analysis
+          </button>
+          <button id="tab-guide" onclick="switchTab('guide')" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-300 hover:text-white transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-book-open"></i> User Guide & Theory
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Banner (Replaces alert()) -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md pointer-events-none"></div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ==================== TAB 1: DASHBOARD & ANALYSIS ==================== -->
+    <div id="view-dashboard" class="space-y-6">
+
+      <!-- 1-Click Preset Dataset Switcher Banner -->
+      <section class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl border border-slate-700 shadow-md p-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-400/30 text-teal-300 flex items-center justify-center text-sm shrink-0">
+              <i class="fa-solid fa-database"></i>
+            </span>
+            <div>
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-teal-300 block">1-Click Homework Dataset Switcher</span>
+              <span class="text-xs text-slate-300">Switch seamlessly between HW2 Question 1, Question 2, or an uploaded Excel workbook</span>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btn-preset-q1" onclick="loadPresetDataset('Q1')" class="px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer bg-teal-600 text-white shadow-sm ring-2 ring-teal-400/50">
+              <i class="fa-solid fa-fire-flame-curved"></i> HW2 Question 1 (Gas-Cap)
+            </button>
+            <button id="btn-preset-q2" onclick="loadPresetDataset('Q2')" class="px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600">
+              <i class="fa-solid fa-droplet"></i> HW2 Question 2 (Solution-Gas)
+            </button>
+            <button id="btn-preset-custom" onclick="document.getElementById('excel-upload').click()" class="px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600">
+              <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Uploaded / Custom Excel
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Top Toolbar: Excel Import / Export / Reset -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div class="flex items-start sm:items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+              <i class="fa-solid fa-file-excel text-emerald-600 text-lg"></i>
+            </div>
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">Dataset &amp; Excel I/O Manager</h2>
+              <p id="active-dataset-label" class="text-xs text-slate-500 mt-0.5">
+                Loaded: <span class="font-semibold text-teal-700">PNGE4412 HW2 Question 1 (Gas-Cap Oil Reservoir)</span> (7 pressure steps, $p_i = 3300\text{ psia}$)
+              </p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Hidden File Input -->
+            <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleFileUpload(event)" />
+            <button onclick="document.getElementById('excel-upload').click()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition flex items-center gap-2 cursor-pointer">
+              <i class="fa-solid fa-upload text-teal-400"></i> Upload Excel (.xlsx / .csv)
+            </button>
+            <button onclick="downloadActiveExcel()" class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition flex items-center gap-2 cursor-pointer">
+              <i class="fa-solid fa-download"></i> Download Active Dataset as Excel (.xlsx)
+            </button>
+            <button onclick="exportResultsCSV()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold transition flex items-center gap-2 cursor-pointer">
+              <i class="fa-solid fa-file-csv"></i> Export MBE Results
+            </button>
+            <button onclick="resetActivePreset()" class="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer" title="Restore Active Dataset Defaults">
+              <i class="fa-solid fa-rotate-left"></i> Reset Active
+            </button>
+          </div>
+        </div>
+
+        <!-- Unit Normalization & Formulation Controls -->
+        <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cumulative Oil ($N_p$) Unit</label>
+            <select id="unit-np" onchange="recalculateAll()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="MMSTB" selected>MMSTB (10⁶ STB)</option>
+              <option value="STB">STB (Stock Tank Barrels)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cumulative Gas ($G_p$) Unit</label>
+            <select id="unit-gp" onchange="recalculateAll()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="MMMSCF" selected>MMMSCF / BSCF (10⁹ SCF)</option>
+              <option value="MMSCF">MMSCF (10⁶ SCF)</option>
+              <option value="SCF">SCF (Standard Cubic Feet)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Gas FVF ($B_g, B_{gi}$) Unit</label>
+            <select id="unit-bg" onchange="recalculateAll()" class="w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="cuft/SCF" selected>cuft/SCF (÷ 5.614583 to rb/SCF)</option>
+              <option value="rb/STB">rb/STB (or rb/SCF)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Havlena–Odeh Formulation</label>
+            <select id="mbe-mode" onchange="recalculateAll()" class="w-full rounded-xl border border-teal-300 bg-teal-50/60 px-3 py-1.5 text-xs font-semibold text-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="full" selected>Gas-Cap + Efw: F/(Eo+Efw) vs (Eg+Efw)/(Eo+Efw)</option>
+              <option value="classic">Gas-Cap (No Efw): F/Eo vs Eg/Eo</option>
+              <option value="undersaturated">Volumetric Check (m = 0): F vs (Eo + Efw)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- KPI Output Cards: N, m, G, R^2 -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- STOIIP (N) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Initial Oil in Place ($N$)</span>
+            <span class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center text-sm"><i class="fa-solid fa-droplet"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpi-n" class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900">—</span>
+            <span class="text-xs font-semibold text-teal-700">MMSTB</span>
+          </div>
+          <p id="kpi-n-stb" class="text-[11px] font-mono text-slate-400 mt-1">— STB</p>
+        </div>
+
+        <!-- Gas-Cap Ratio (m) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Gas-Cap Volume Ratio ($m$)</span>
+            <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm"><i class="fa-solid fa-layer-group"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpi-m" class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900">—</span>
+            <span class="text-xs font-semibold text-indigo-700">dim.</span>
+          </div>
+          <p id="kpi-m-note" class="text-[11px] text-slate-500 mt-1 truncate">Ratio $G B_{gi} / (N B_{oi})$</p>
+        </div>
+
+        <!-- Initial Gas-Cap Gas (G) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Gas-Cap Gas in Place ($G$)</span>
+            <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm"><i class="fa-solid fa-fire-flame-simple"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpi-g-bscf" class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900">—</span>
+            <span class="text-xs font-semibold text-amber-700">BSCF</span>
+          </div>
+          <p id="kpi-g-mmscf" class="text-[11px] font-mono text-slate-400 mt-1">— MMSCF</p>
+        </div>
+
+        <!-- Regression Quality (R^2 & Slope/Intercept) -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Regression Fit ($R^2$)</span>
+            <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm"><i class="fa-solid fa-ruler-combined"></i></span>
+          </div>
+          <div class="mt-3 flex items-baseline gap-2">
+            <span id="kpi-r2" class="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-900">—</span>
+            <span id="kpi-pts" class="text-xs font-semibold text-emerald-700">10 pts</span>
+          </div>
+          <p id="kpi-eq" class="text-[11px] font-mono text-slate-500 mt-1 truncate">y = mx + b</p>
+        </div>
+      </section>
+
+      <!-- Engineering Diagnostic Callout -->
+      <div id="diagnostic-banner" class="rounded-2xl border p-4 flex items-start gap-3 text-xs leading-relaxed">
+        <i id="diagnostic-icon" class="fa-solid fa-circle-info text-base mt-0.5 shrink-0"></i>
+        <div id="diagnostic-text"></div>
+      </div>
+
+      <!-- Primary & Secondary Interactive Charts -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Main Havlena-Odeh Straight Line Plot (7 cols) -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div>
+      <!-- Primary & Secondary Interactive Charts (Plotly.js) -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Main Havlena-Odeh Straight Line Plot (7 cols) -->
+        <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <div>
+              <h3 id="chart1-title" class="text-sm font-bold text-slate-800">Havlena–Odeh Straight-Line Plot</h3>
+              <p id="chart1-subtitle" class="text-xs text-slate-500">Intercept = $N$ (MMSTB) &nbsp;|&nbsp; Slope = $m \cdot N$ (MMSTB)</p>
+            </div>
+            <span id="chart1-badge" class="self-start sm:self-auto px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-mono text-[11px] font-semibold">
+              Plotly Interactive OLS
+            </span>
+          </div>
+          <div id="havlenaPlot" class="w-full h-80 sm:h-96"></div>
+        </div>
+
+        <!-- Secondary Diagnostic / History Charts (5 cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+          <!-- F vs Total Expansion Diagnostic Plot -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">Diagnostic Plot: $F$ vs. $E_o + m E_g + (1+m) E_{fw}$</h3>
+                <p class="text-xs text-slate-500">Verifies linear trend through origin with slope $N$</p>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-mono text-[11px] font-semibold">QC Check</span>
+            </div>
+            <div id="diagnosticPlot" class="w-full h-48"></div>
+          </div>
+
+          <!-- Reservoir Pressure & Cumulative Production Profile -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 flex flex-col">
+            <div class="flex items-center justify-between mb-1">
+              <div>
+                <h3 class="text-sm font-bold text-slate-800">Pressure &amp; Cumulative Production</h3>
+                <p class="text-xs text-slate-500">Reservoir pressure $P$ vs. $N_p$ and $G_p$</p>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-mono text-[11px] font-semibold">History</span>
+            </div>
+            <div id="historyPlot" class="w-full h-48"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Initial Reservoir Parameters & Editable Production/PVT Table -->
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left: Initial Reservoir Parameters Card (4 cols) -->
+        <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 self-start">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Initial Reservoir Parameters</h3>
+              <p class="text-xs text-slate-500">Sheet 2 (<span class="font-mono">Initial_Parameters</span>) — Editable</p>
+            </div>
+            <span class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-sliders"></i>
+            </span>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$p_i$ (psia)</label>
+              <input type="number" step="any" id="param-pi" onchange="updateInitialParam('pi', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$B_{oi}$ (rb/STB)</label>
+              <input type="number" step="any" id="param-boi" onchange="updateInitialParam('Boi', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$B_{gi}$ (gas FVF)</label>
+              <input type="number" step="any" id="param-bgi" onchange="updateInitialParam('Bgi', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$R_{si}$ (SCF/STB)</label>
+              <input type="number" step="any" id="param-rsi" onchange="updateInitialParam('Rsi', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$S_{wc}$ (fraction)</label>
+              <input type="number" step="any" id="param-swc" onchange="updateInitialParam('Swc', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">Porosity $\phi$ (frac.)</label>
+              <input type="number" step="any" id="param-phi" onchange="updateInitialParam('phi', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$C_w$ ($\text{psi}^{-1}$)</label>
+              <input type="number" step="any" id="param-cw" onchange="updateInitialParam('Cw', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-600 mb-1">$C_f$ ($\text{psi}^{-1}$)</label>
+              <input type="number" step="any" id="param-cf" onchange="updateInitialParam('Cf', this.value)" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 font-mono text-slate-800 focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-[11px] text-slate-500">
+            <div class="flex items-center justify-between">
+              <span>Converted $B_{gi}$ (rb/SCF):</span>
+              <span id="param-bgi-rb-display" class="font-mono font-semibold text-teal-700">— rb/SCF</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span>Effective Compressibility $c_e$:</span>
+              <span id="param-ce-display" class="font-mono font-semibold text-slate-700">— psi⁻¹</span>
+            </div>
+            <p id="param-compressibility-note" class="text-[10px] text-slate-400 italic pt-1">
+              Note: Rock &amp; connate water compressibility are neglected in Q1 ($S_{wc}=0, C_w=0, C_f=0$) unless entered above.
+            </p>
+          </div>
+        </div>
+
+        <!-- Right: Production, PVT & Computed Havlena-Odeh Table (8 cols) -->
+        <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Production, PVT & Material Balance Step Table</h3>
+              <p class="text-xs text-slate-500">Toggle checkboxes to exclude noisy early/late points from OLS regression, or edit cells live</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="addTableRow()" class="px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-semibold transition flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-plus"></i> Add Row
+              </button>
+              <button onclick="selectAllRows(true)" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer">
+                Include All
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-3 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+                  <th class="py-2.5 px-2 text-center">Fit</th>
+                  <th class="py-2.5 px-2">P (psia)</th>
+                  <th class="py-2.5 px-2">Rs</th>
+                  <th class="py-2.5 px-2">Bo</th>
+                  <th class="py-2.5 px-2">Bg</th>
+                  <th class="py-2.5 px-2">Np</th>
+                  <th class="py-2.5 px-2">Gp</th>
+                  <th class="py-2.5 px-2 text-right text-teal-800">F (MMrb)</th>
+                  <th class="py-2.5 px-2 text-right text-indigo-800">X-Axis</th>
+                  <th class="py-2.5 px-2 text-right text-indigo-800">Y-Axis (MMSTB)</th>
+                  <th class="py-2.5 px-1 text-center"></th>
+                </tr>
+              </thead>
+              <tbody id="mbe-table-body" class="divide-y divide-slate-100 font-mono tabular-nums">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== TAB 2: USER GUIDE & METHODOLOGY ==================== -->
+    <div id="view-guide" class="hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto space-y-6">
+        <div class="border-b border-slate-200 pb-4">
+          <span class="px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-semibold">PNGE4412 Reservoir Engineering • Documentation</span>
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-900 mt-2">User Guide & Havlena–Odeh Material Balance Methodology</h2>
+          <p class="text-sm text-slate-600 mt-1">Complete instructions for preparing input Excel workbooks, running straight-line MBE regression, and interpreting reservoir drive mechanisms.</p>
+        </div>
+
+        <!-- Step-by-Step Usage -->
+        <div class="space-y-4">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-teal-600 text-white text-xs flex items-center justify-center">1</span>
+            How to Use the Preset Switcher &amp; Prepare Your Excel File
+          </h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Use the <strong>1-Click Homework Dataset Switcher</strong> at the top of the dashboard to toggle between <strong>HW2 Question 1 (Gas-Cap Reservoir)</strong>, <strong>HW2 Question 2 (Solution-Gas Reservoir)</strong>, or your own uploaded Excel file. Click <strong>"Download Active Dataset as Excel (.xlsx)"</strong> to export a clean 2-sheet workbook:
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-slate-800 mb-2">Sheet 1: <span class="font-mono text-teal-700">Production_PVT_Data</span></h4>
+              <p class="text-slate-600 mb-2">Must contain a header row with the following columns (order flexible):</p>
+              <ul class="space-y-1 font-mono text-slate-700 list-disc list-inside">
+                <li><strong>P</strong> : Average reservoir pressure (psia)</li>
+                <li><strong>Rs</strong> : Solution GOR (SCF/STB)</li>
+                <li><strong>Bo</strong> : Oil formation volume factor (rb/STB)</li>
+                <li><strong>Bg</strong> : Gas FVF (cuft/SCF or rb/STB)</li>
+                <li><strong>Np</strong> : Cumulative oil produced (MMSTB or STB)</li>
+                <li><strong>Gp</strong> : Cumulative gas produced (MMMSCF, MMSCF, or SCF)</li>
+              </ul>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-slate-800 mb-2">Sheet 2: <span class="font-mono text-teal-700">Initial_Parameters</span></h4>
+              <p class="text-slate-600 mb-2">Two-column key-value table (<code class="font-mono">Property</code> | <code class="font-mono">Value</code>):</p>
+              <ul class="space-y-1 font-mono text-slate-700 list-disc list-inside">
+                <li><strong>pi</strong> : Initial reservoir pressure (psia)</li>
+                <li><strong>Boi</strong> : Initial oil FVF (rb/STB)</li>
+                <li><strong>Bgi</strong> : Initial gas FVF (same unit as Bg)</li>
+                <li><strong>Rsi</strong> : Initial solution GOR (SCF/STB)</li>
+                <li><strong>Swc</strong> : Connate water saturation (fraction)</li>
+                <li><strong>Cw</strong> : Water compressibility (psi⁻¹)</li>
+                <li><strong>Cf</strong> : Formation compressibility (psi⁻¹)</li>
+                <li><strong>phi</strong> : Porosity (fraction, optional)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mathematical Formulation & Unit Conversion -->
+        <div class="space-y-3 pt-2">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-teal-600 text-white text-xs flex items-center justify-center">2</span>
+            Havlena–Odeh Straight-Line Equations &amp; Unit Conversions
+          </h3>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            The general material balance equation for a reservoir with an initial gas cap ($m$) and formation/connate water expansion ($E_{fw}$) is expressed by Havlena and Odeh (1963) as:
+          </p>
+          <div class="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs space-y-2 overflow-x-auto">
+            <div>F = N · [ E<sub>o</sub> + m · E<sub>g</sub> + (1 + m) · E<sub>fw</sub> ]</div>
+            <div class="text-slate-400">where:</div>
+            <div>• Underground Withdrawal: &nbsp; F &nbsp; = N<sub>p</sub> [ B<sub>o</sub> + (R<sub>p</sub> − R<sub>s</sub>) B<sub>g</sub> ] &nbsp;&nbsp; (with R<sub>p</sub> = G<sub>p</sub> / N<sub>p</sub> in SCF/STB)</div>
+            <div>• Oil &amp; Gas Expansion: &nbsp;&nbsp;&nbsp; E<sub>o</sub> &nbsp;= (B<sub>o</sub> − B<sub>oi</sub>) + (R<sub>si</sub> − R<sub>s</sub>) B<sub>g</sub></div>
+            <div>• Gas-Cap Expansion: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; E<sub>g</sub> &nbsp;= B<sub>oi</sub> ( B<sub>g</sub> / B<sub>gi</sub> − 1 )</div>
+            <div>• Pore &amp; Water Expansion: &nbsp; E<sub>fw</sub> = B<sub>oi</sub> [ (C<sub>w</sub> S<sub>wc</sub> + C<sub>f</sub>) / (1 − S<sub>wc</sub>) ] (p<sub>i</sub> − p)</div>
+            <div class="text-teal-300 pt-1">• Unit Conversions: 1 bbl = 5.614583 cuft &rArr; B<sub>g</sub> [rb/SCF] = B<sub>g</sub> [cuft/SCF] / 5.614583; 1 MMMSCF = 10<sup>9</sup> SCF</div>
+          </div>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Dividing both sides by $(E_o + E_{fw})$ yields a straight line $Y = a + b X$:
+          </p>
+          <div class="p-3.5 rounded-xl bg-teal-50 border border-teal-200 font-mono text-xs text-teal-950">
+            Y = F / (E<sub>o</sub> + E<sub>fw</sub>) = N + (m · N) · [ (E<sub>g</sub> + E<sub>fw</sub>) / (E<sub>o</sub> + E<sub>fw</sub>) ]
+          </div>
+          <ul class="text-sm text-slate-600 list-disc list-inside space-y-1">
+            <li><strong>Y-Intercept ($a$):</strong> Stock-Tank Original Oil in Place, $N$ (MMSTB).</li>
+            <li><strong>Slope ($b$):</strong> Product $m \cdot N$, so the gas-cap ratio is $m = b / a$.</li>
+            <li><strong>Initial Gas-Cap Gas in Place ($G$):</strong> Computed from reservoir volume balance as $G = \frac{m \cdot N \cdot B_{oi}}{B_{gi}}$.</li>
+          </ul>
+        </div>
+
+        <!-- Interpreting Question 1 & Question 2 Datasets -->
+        <div class="space-y-3 pt-2">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-teal-600 text-white text-xs flex items-center justify-center">3</span>
+            Benchmark Verification: HW2 Question 1 &amp; Question 2
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600 leading-relaxed">
+            <div class="p-4 rounded-xl bg-teal-50/50 border border-teal-200">
+              <h4 class="font-bold text-teal-900 mb-1">Question 1 (Active Default — Gas-Cap Drive)</h4>
+              <p>With $p_i = 3300\text{ psia}$, $N_p$ in <code class="font-mono">MMSTB</code>, $G_p$ in <code class="font-mono">MMMSCF</code>, and $B_g$ in <code class="font-mono">cuft/SCF</code> ($B_{gi} = 0.00488505\text{ cuft/SCF} = 0.00087006\text{ rb/SCF}$), OLS regression over the 6 producing pressure steps yields <strong>$N = 108.68\text{ MMSTB}$</strong>, <strong>$m = 0.5414$</strong>, and <strong>$G = 84.60\text{ BSCF}$</strong> ($84,601.4\text{ MMSCF}$) with $R^2 = 0.9677$.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <h4 class="font-bold text-slate-800 mb-1">Question 2 (Solution-Gas Drive Check)</h4>
+              <p>With $p_i = 2740\text{ psia}$, $N_p$ in <code class="font-mono">MMSTB</code>, $G_p$ in <code class="font-mono">MMSCF</code>, and $B_g$ in <code class="font-mono">rb/STB</code>, $F / (E_o + E_{fw})$ remains nearly constant around <strong>$530.2\text{ MMSTB}$</strong> with a near-zero slope ($m \approx 0$, $G \approx 0$), confirming a volumetric solution-gas drive reservoir with no initial gas cap.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 mt-10">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>Sultan Qaboos University • Department of Petroleum &amp; Chemical Engineering (PNGE4412)</span>
+      <span class="font-mono text-slate-400">Havlena–Odeh Straight-Line MBE Engine</span>
+    </div>
+  </footer>
+
+  <!-- ==================== JAVASCRIPT ENGINE ==================== -->
+  <script>
+    // Exact conversion factor: 1 bbl = 5.614583 cuft
+    const CUFT_PER_BBL = 5.614583;
+
+    // -------------------------------------------------------------------------
+    // 1A. PRESET DATASET 1: PNGE4412 HW2 QUESTION 1 (GAS-CAP OIL RESERVOIR)
+    // -------------------------------------------------------------------------
+    const Q1_DEFAULT_PARAMS = {
+      pi: 3300,
+      Boi: 1.2511,
+      Bgi: 0.00488505,
+      Rsi: 510,
+      Swc: 0.00,
+      Cw: 0.00,
+      Cf: 0.00,
+      phi: 0.20,
+    };
+
+    const Q1_DEFAULT_UNITS = {
+      np: 'MMSTB',
+      gp: 'MMMSCF',
+      bg: 'cuft/SCF',
+      mode: 'full',
+    };
+
+    const Q1_DEFAULT_ROWS = [
+      { id: 1, include: false, P: 3300, Rs: 510, Bo: 1.2511, Bg: 0.00488505, Np: 0,      Gp: 0 },
+      { id: 2, include: true,  P: 3150, Rs: 477, Bo: 1.2353, Bg: 0.00516580, Np: 3.295,  Gp: 3.460 },
+      { id: 3, include: true,  P: 3000, Rs: 450, Bo: 1.2222, Bg: 0.00539040, Np: 5.903,  Gp: 6.257 },
+      { id: 4, include: true,  P: 2850, Rs: 425, Bo: 1.2122, Bg: 0.00567115, Np: 8.852,  Gp: 10.268 },
+      { id: 5, include: true,  P: 2700, Rs: 401, Bo: 1.2022, Bg: 0.00600805, Np: 11.503, Gp: 14.206 },
+      { id: 6, include: true,  P: 2550, Rs: 375, Bo: 1.1922, Bg: 0.00634495, Np: 14.513, Gp: 18.359 },
+      { id: 7, include: true,  P: 2400, Rs: 352, Bo: 1.1822, Bg: 0.00673800, Np: 17.730, Gp: 23.049 },
+    ];
+
+    // -------------------------------------------------------------------------
+    // 1B. PRESET DATASET 2: PNGE4412 HW2 QUESTION 2 (SOLUTION-GAS RESERVOIR)
+    // -------------------------------------------------------------------------
+    const Q2_DEFAULT_PARAMS = {
+      pi: 2740,
+      Boi: 1.404,
+      Bgi: 0.0009,
+      Rsi: 650,
+      Swc: 0.05,
+      Cw: 3.00e-6,
+      Cf: 4.00e-6,
+      phi: 0.25,
+    };
+
+    const Q2_DEFAULT_UNITS = {
+      np: 'MMSTB',
+      gp: 'MMSCF',
+      bg: 'rb/STB',
+      mode: 'full',
+    };
+
+    const Q2_DEFAULT_ROWS = [
+      { id: 1,  include: false, P: 2740, Rs: 650, Bo: 1.404, Bg: 0.0009, Np: 0.00,  Gp: 0 },
+      { id: 2,  include: true,  P: 2500, Rs: 592, Bo: 1.374, Bg: 0.0010, Np: 7.88,  Gp: 5988.8 },
+      { id: 3,  include: true,  P: 2290, Rs: 545, Bo: 1.349, Bg: 0.0011, Np: 18.42, Gp: 15565 },
+      { id: 4,  include: true,  P: 2109, Rs: 507, Bo: 1.329, Bg: 0.0012, Np: 29.15, Gp: 26818 },
+      { id: 5,  include: true,  P: 1949, Rs: 471, Bo: 1.316, Bg: 0.0013, Np: 40.69, Gp: 39673 },
+      { id: 6,  include: true,  P: 1818, Rs: 442, Bo: 1.303, Bg: 0.0014, Np: 50.14, Gp: 51394 },
+      { id: 7,  include: true,  P: 1702, Rs: 418, Bo: 1.294, Bg: 0.0015, Np: 58.42, Gp: 62217 },
+      { id: 8,  include: true,  P: 1608, Rs: 398, Bo: 1.287, Bg: 0.0016, Np: 65.39, Gp: 71603 },
+      { id: 9,  include: true,  P: 1535, Rs: 383, Bo: 1.280, Bg: 0.0017, Np: 70.74, Gp: 79229 },
+      { id: 10, include: true,  P: 1480, Rs: 370, Bo: 1.276, Bg: 0.0018, Np: 74.54, Gp: 85348 },
+      { id: 11, include: true,  P: 1440, Rs: 362, Bo: 1.273, Bg: 0.0018, Np: 77.43, Gp: 89819 },
+    ];
+
+    // Application State (Defaulting to Q1)
+    let state = {
+      activeKey: 'Q1', // 'Q1' | 'Q2' | 'CUSTOM'
+      datasetName: 'PNGE4412 HW2 Question 1 (Gas-Cap Oil Reservoir)',
+      params: { ...Q1_DEFAULT_PARAMS },
+      rows: JSON.parse(JSON.stringify(Q1_DEFAULT_ROWS)),
+      computedSteps: [],
+      regression: null,
+    };
+
+    // -------------------------------------------------------------------------
+    // 2. PRESET SWITCHER & TOAST NOTIFICATION SYSTEM
+    // -------------------------------------------------------------------------
+    function updatePresetButtonsUI() {
+      const btnQ1 = document.getElementById('btn-preset-q1');
+      const btnQ2 = document.getElementById('btn-preset-q2');
+      const btnCustom = document.getElementById('btn-preset-custom');
+
+      const activeCls = 'px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer bg-teal-600 text-white shadow-sm ring-2 ring-teal-400/50';
+      const inactiveCls = 'px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer bg-slate-700/80 hover:bg-slate-700 text-slate-200 border border-slate-600';
+
+      btnQ1.className = state.activeKey === 'Q1' ? activeCls : inactiveCls;
+      btnQ2.className = state.activeKey === 'Q2' ? activeCls : inactiveCls;
+      btnCustom.className = state.activeKey === 'CUSTOM' ? activeCls : inactiveCls;
+    }
+
+    function loadPresetDataset(presetKey, silent = false) {
+      if (presetKey === 'Q1') {
+        state.activeKey = 'Q1';
+        state.datasetName = 'PNGE4412 HW2 Question 1 (Gas-Cap Oil Reservoir)';
+        state.params = { ...Q1_DEFAULT_PARAMS };
+        state.rows = JSON.parse(JSON.stringify(Q1_DEFAULT_ROWS));
+
+        document.getElementById('unit-np').value = Q1_DEFAULT_UNITS.np;
+        document.getElementById('unit-gp').value = Q1_DEFAULT_UNITS.gp;
+        document.getElementById('unit-bg').value = Q1_DEFAULT_UNITS.bg;
+        document.getElementById('mbe-mode').value = Q1_DEFAULT_UNITS.mode;
+
+        document.getElementById('active-dataset-label').innerHTML =
+          `Loaded: <span class="font-semibold text-teal-700">${state.datasetName}</span> (7 pressure steps, $p_i = 3300\\text{ psia}$, $B_g$ in cuft/SCF)`;
+        document.getElementById('param-compressibility-note').textContent =
+          'Note: Rock & connate water compressibility are neglected in Q1 (Swc = 0, Cw = 0, Cf = 0) unless entered above.';
+      } else if (presetKey === 'Q2') {
+        state.activeKey = 'Q2';
+        state.datasetName = 'PNGE4412 HW2 Question 2 (Solution-Gas Reservoir)';
+        state.params = { ...Q2_DEFAULT_PARAMS };
+        state.rows = JSON.parse(JSON.stringify(Q2_DEFAULT_ROWS));
+
+        document.getElementById('unit-np').value = Q2_DEFAULT_UNITS.np;
+        document.getElementById('unit-gp').value = Q2_DEFAULT_UNITS.gp;
+        document.getElementById('unit-bg').value = Q2_DEFAULT_UNITS.bg;
+        document.getElementById('mbe-mode').value = Q2_DEFAULT_UNITS.mode;
+
+        document.getElementById('active-dataset-label').innerHTML =
+          `Loaded: <span class="font-semibold text-teal-700">${state.datasetName}</span> (11 pressure steps, $p_i = 2740\\text{ psia}$, $B_g$ in rb/STB)`;
+        document.getElementById('param-compressibility-note').textContent =
+          'Note: Q2 includes connate water & rock compressibility (Swc = 0.05, Cw = 3e-6, Cf = 4e-6 psi⁻¹).';
+      }
+
+      updatePresetButtonsUI();
+      syncParamInputs();
+      recalculateAll();
+      if (!silent) {
+        showToast(`Loaded <strong>${state.datasetName}</strong>.`, 'info');
+      }
+    }
+
+    function resetActivePreset() {
+      if (state.activeKey === 'Q2') {
+        loadPresetDataset('Q2');
+      } else {
+        loadPresetDataset('Q1');
+      }
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const colors = {
+        success: 'bg-emerald-900 text-emerald-50 border-emerald-700',
+        error: 'bg-rose-900 text-rose-50 border-rose-700',
+        warning: 'bg-amber-900 text-amber-50 border-amber-700',
+        info: 'bg-slate-900 text-slate-50 border-slate-700',
+      };
+      const icons = {
+        success: 'fa-circle-check text-emerald-400',
+        error: 'fa-circle-exclamation text-rose-400',
+        warning: 'fa-triangle-exclamation text-amber-400',
+        info: 'fa-circle-info text-teal-400',
+      };
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto flex items-start gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs transition-all duration-300 ${colors[type] || colors.info}`;
+      el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} mt-0.5 text-sm"></i><div class="flex-1">${message}</div>`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(8px)';
+        setTimeout(() => el.remove(), 300);
+      }, 4500);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. TAB SWITCHING
+    // -------------------------------------------------------------------------
+    function switchTab(tab) {
+      const dashView = document.getElementById('view-dashboard');
+      const guideView = document.getElementById('view-guide');
+      const tabDash = document.getElementById('tab-dashboard');
+      const tabGuide = document.getElementById('tab-guide');
+
+      if (tab === 'dashboard') {
+        dashView.classList.remove('hidden');
+        guideView.classList.add('hidden');
+        tabDash.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 text-white shadow-sm transition-all flex items-center gap-1.5';
+        tabGuide.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-300 hover:text-white transition-all flex items-center gap-1.5';
+        // Trigger Plotly resize when returning to visible tab
+        setTimeout(() => {
+          Plotly.Plots.resize('havlenaPlot');
+          Plotly.Plots.resize('diagnosticPlot');
+          Plotly.Plots.resize('historyPlot');
+        }, 50);
+      } else {
+        dashView.classList.add('hidden');
+        guideView.classList.remove('hidden');
+        tabGuide.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-600 text-white shadow-sm transition-all flex items-center gap-1.5';
+        tabDash.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-300 hover:text-white transition-all flex items-center gap-1.5';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. CORE HAVLENA-ODEH MATERIAL BALANCE ENGINE
+    // -------------------------------------------------------------------------
+    function getUnitMultipliers() {
+      const npUnit = document.getElementById('unit-np').value;
+      const gpUnit = document.getElementById('unit-gp').value;
+      const bgUnit = document.getElementById('unit-bg').value;
+
+      // Convert Np to STB
+      const npToSTB = npUnit === 'MMSTB' ? 1e6 : 1;
+      // Convert Gp to SCF (1 MMMSCF = 1 BSCF = 10^9 SCF)
+      const gpToSCF = gpUnit === 'MMSCF' ? 1e6 : gpUnit === 'MMMSCF' ? 1e9 : 1;
+      // Convert Bg to rb/SCF (1 bbl = 5.614583 cuft)
+      const bgToRbPerSCF = bgUnit === 'cuft/SCF' ? (1 / CUFT_PER_BBL) : 1;
+
+      return { npToSTB, gpToSCF, bgToRbPerSCF, npUnit, gpUnit, bgUnit };
+    }
+
+    function ordinaryLeastSquares(points) {
+      const n = points.length;
+      if (n < 2) {
+        return { slope: 0, intercept: points[0]?.y || 0, r2: 0, valid: false };
+      }
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+      for (const pt of points) {
+        sumX += pt.x;
+        sumY += pt.y;
+        sumXY += pt.x * pt.y;
+        sumX2 += pt.x * pt.x;
+      }
+      const denom = n * sumX2 - sumX * sumX;
+      if (Math.abs(denom) < 1e-24) {
+        return { slope: 0, intercept: sumY / n, r2: 0, valid: false };
+      }
+      const slope = (n * sumXY - sumX * sumY) / denom;
+      const intercept = (sumY - slope * sumX) / n;
+
+      const meanY = sumY / n;
+      let ssTot = 0, ssRes = 0;
+      for (const pt of points) {
+        const yHat = intercept + slope * pt.x;
+        ssTot += Math.pow(pt.y - meanY, 2);
+        ssRes += Math.pow(pt.y - yHat, 2);
+      }
+      const r2 = ssTot > 1e-24 ? Math.max(0, 1 - ssRes / ssTot) : 1;
+      return { slope, intercept, r2, valid: true };
+    }
+
+    function zeroInterceptOLS(points) {
+      if (points.length === 0) return { slope: 0, intercept: 0, r2: 0, valid: false };
+      let sumXY = 0, sumX2 = 0, sumY = 0;
+      for (const pt of points) {
+        sumXY += pt.x * pt.y;
+        sumX2 += pt.x * pt.x;
+        sumY += pt.y;
+      }
+      const slope = sumX2 > 1e-24 ? sumXY / sumX2 : 0;
+      const meanY = sumY / points.length;
+      let ssTot = 0, ssRes = 0;
+      for (const pt of points) {
+        ssTot += Math.pow(pt.y - meanY, 2);
+        ssRes += Math.pow(pt.y - slope * pt.x, 2);
+      }
+      const r2 = ssTot > 1e-24 ? Math.max(0, 1 - ssRes / ssTot) : 1;
+      return { slope, intercept: 0, r2, valid: true };
+    }
+
+    function recalculateAll() {
+      const p = state.params;
+      const mult = getUnitMultipliers();
+      const mode = document.getElementById('mbe-mode').value;
+
+      // Effective compressibility ce = (Cw * Swc + Cf) / (1 - Swc)
+      const denomSw = Math.max(1e-6, 1 - p.Swc);
+      const ce = (p.Cw * p.Swc + p.Cf) / denomSw;
+      document.getElementById('param-ce-display').textContent = `${ce.toExponential(3)} psi⁻¹`;
+
+      const Bgi_rb = p.Bgi * mult.bgToRbPerSCF;
+      document.getElementById('param-bgi-rb-display').textContent = `${Bgi_rb.toFixed(8)} rb/SCF`;
+
+      // Compute step-by-step MBE terms
+      const steps = state.rows.map((row) => {
+        const Np_stb = row.Np * mult.npToSTB;
+        const Gp_scf = row.Gp * mult.gpToSCF;
+        const Bg_rb = row.Bg * mult.bgToRbPerSCF;
+
+        const isInitialPoint = Np_stb <= 0 || Math.abs(row.P - p.pi) < 1e-9;
+        const Rp = Np_stb > 0 ? Gp_scf / Np_stb : 0;
+
+        // F = Np * [Bo + (Rp - Rs) * Bg] (in reservoir barrels)
+        const F_rb = Np_stb * (row.Bo + (Rp - row.Rs) * Bg_rb);
+
+        // Eo = (Bo - Boi) + (Rsi - Rs) * Bg (in rb/STB)
+        const Eo = (row.Bo - p.Boi) + (p.Rsi - row.Rs) * Bg_rb;
+
+        // Eg = Boi * (Bg / Bgi - 1) (in rb/STB)
+        const Eg = Bgi_rb > 0 ? p.Boi * (Bg_rb / Bgi_rb - 1) : 0;
+
+        // Efw = Boi * ce * (pi - P) (in rb/STB)
+        const Efw = p.Boi * ce * (p.pi - row.P);
+
+        let X = null, Y = null;
+        if (!isInitialPoint) {
+          if (mode === 'full') {
+            const denom = Eo + Efw;
+            if (Math.abs(denom) > 1e-12) {
+              X = (Eg + Efw) / denom;
+              Y = (F_rb / denom) / 1e6; // in MMSTB
+            }
+          } else if (mode === 'classic') {
+            if (Math.abs(Eo) > 1e-12) {
+              X = Eg / Eo;
+              Y = (F_rb / Eo) / 1e6; // in MMSTB
+            }
+          } else if (mode === 'undersaturated') {
+            X = Eo + Efw; // rb/STB
+            Y = F_rb / 1e6; // MMrb
+          }
+        }
+
+        return {
+          ...row,
+          isInitialPoint,
+          Np_stb,
+          Gp_scf,
+          Bg_rb,
+          Rp,
+          F_rb,
+          F_mmrb: F_rb / 1e6,
+          Eo,
+          Eg,
+          Efw,
+          X,
+          Y,
+        };
+      });
+
+      state.computedSteps = steps;
+
+      // Filter valid points selected for regression
+      const activePoints = steps
+        .filter((s) => s.include && !s.isInitialPoint && s.X !== null && s.Y !== null && Number.isFinite(s.X) && Number.isFinite(s.Y))
+        .map((s) => ({ x: s.X, y: s.Y, P: s.P }));
+
+      let N_mmstb = 0, m_ratio = 0, G_scf = 0, reg = null;
+
+      if (mode === 'undersaturated') {
+        reg = zeroInterceptOLS(activePoints);
+        N_mmstb = reg.slope;
+        m_ratio = 0;
+        G_scf = 0;
+      } else {
+        reg = ordinaryLeastSquares(activePoints);
+        N_mmstb = reg.intercept;
+        m_ratio = Math.abs(N_mmstb) > 1e-9 ? reg.slope / N_mmstb : 0;
+        // G = m * N * Boi / Bgi (with N in STB, G in SCF)
+        G_scf = Bgi_rb > 0 ? (m_ratio * (N_mmstb * 1e6) * p.Boi) / Bgi_rb : 0;
+      }
+
+      // Compute Total Expansion Et = Eo + m*Eg + (1+m)*Efw for Diagnostic Plot
+      const mEffective = Math.max(0, m_ratio);
+      steps.forEach((s) => {
+        s.Et = mode === 'classic'
+          ? s.Eo + mEffective * s.Eg
+          : s.Eo + mEffective * s.Eg + (1 + mEffective) * s.Efw;
+      });
+
+      state.regression = {
+        ...reg,
+        N_mmstb,
+        m_ratio,
+        G_scf,
+        activeCount: activePoints.length,
+        mode,
+      };
+
+      updateKPIs();
+      renderTable();
+      updatePlots();
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. UPDATE KPI CARDS & ENGINEERING DIAGNOSTIC BANNER
+    // -------------------------------------------------------------------------
+    function updateKPIs() {
+      const r = state.regression;
+      const N_mmstb = r.N_mmstb;
+      const m = r.m_ratio;
+      const G_bscf = r.G_scf / 1e9;
+      const G_mmscf = r.G_scf / 1e6;
+
+      document.getElementById('kpi-n').textContent = Number.isFinite(N_mmstb) ? N_mmstb.toFixed(2) : '—';
+      document.getElementById('kpi-n-stb').textContent = Number.isFinite(N_mmstb) ? `${(N_mmstb * 1e6).toLocaleString('en-US', { maximumFractionDigits: 0 })} STB` : '— STB';
+
+      document.getElementById('kpi-m').textContent = Number.isFinite(m) ? m.toFixed(4) : '—';
+      document.getElementById('kpi-g-bscf').textContent = Number.isFinite(G_bscf) ? G_bscf.toFixed(2) : '—';
+      document.getElementById('kpi-g-mmscf').textContent = Number.isFinite(G_mmscf) ? `${G_mmscf.toLocaleString('en-US', { maximumFractionDigits: 1 })} MMSCF` : '— MMSCF';
+
+      document.getElementById('kpi-r2').textContent = Number.isFinite(r.r2) ? r.r2.toFixed(4) : '—';
+      document.getElementById('kpi-pts').textContent = `${r.activeCount} pts`;
+
+      if (r.mode === 'undersaturated') {
+        document.getElementById('kpi-eq').textContent = `F = ${r.slope.toFixed(2)} · (Eo + Efw)`;
+      } else {
+        const sign = r.intercept >= 0 ? '+' : '−';
+        document.getElementById('kpi-eq').textContent = `y = ${r.slope.toFixed(2)}x ${sign} ${Math.abs(r.intercept).toFixed(2)}`;
+      }
+
+      // Diagnostic Banner Logic
+      const banner = document.getElementById('diagnostic-banner');
+      const icon = document.getElementById('diagnostic-icon');
+      const text = document.getElementById('diagnostic-text');
+
+      if (r.activeCount < 2) {
+        banner.className = 'rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 p-4 flex items-start gap-3 text-xs leading-relaxed';
+        icon.className = 'fa-solid fa-triangle-exclamation text-amber-600 text-base mt-0.5 shrink-0';
+        text.innerHTML = `<strong>Insufficient Data Points:</strong> Please select at least 2 non-initial pressure steps ($p < p_i$) in the table below to perform linear regression.`;
+      } else if (r.mode !== 'undersaturated' && m < -0.005) {
+        banner.className = 'rounded-2xl border border-amber-200 bg-amber-50/90 text-amber-950 p-4 flex items-start gap-3 text-xs leading-relaxed';
+        icon.className = 'fa-solid fa-compass-drafting text-amber-600 text-base mt-0.5 shrink-0';
+        text.innerHTML = `<strong>Reservoir Drive Interpretation (Near-Zero / Slightly Negative Gas-Cap Slope):</strong> The unconstrained straight-line fit gives <span class="font-mono font-semibold">N = ${N_mmstb.toFixed(2)} MMSTB</span> and <span class="font-mono font-semibold">m = ${m.toFixed(4)}</span> (<span class="font-mono">G = ${G_bscf.toFixed(2)} BSCF</span>). In Havlena–Odeh analysis, a near-zero or slightly negative slope indicates that <strong>no initial gas cap is present ($m \\approx 0$, $G \\approx 0$)</strong> and the reservoir behaves as a volumetric solution-gas drive system. Switch the formulation dropdown to <em>"Volumetric Check (m = 0)"</em> to verify the zero-gas-cap STOIIP.`;
+      } else if (r.mode === 'undersaturated') {
+        banner.className = 'rounded-2xl border border-teal-200 bg-teal-50/80 text-teal-950 p-4 flex items-start gap-3 text-xs leading-relaxed';
+        icon.className = 'fa-solid fa-circle-check text-teal-600 text-base mt-0.5 shrink-0';
+        text.innerHTML = `<strong>Volumetric Solution-Gas Drive Verification ($m = 0$):</strong> Regressing underground withdrawal $F$ directly against $(E_o + E_{fw})$ yields <span class="font-mono font-semibold">N = ${N_mmstb.toFixed(2)} MMSTB</span> with goodness-of-fit <span class="font-mono font-semibold">R² = ${r.r2.toFixed(4)}</span> and <span class="font-mono font-semibold">G = 0 BSCF</span>.`;
+      } else {
+        banner.className = 'rounded-2xl border border-emerald-200 bg-emerald-50/80 text-emerald-950 p-4 flex items-start gap-3 text-xs leading-relaxed';
+        icon.className = 'fa-solid fa-circle-check text-emerald-600 text-base mt-0.5 shrink-0';
+        text.innerHTML = `<strong>Gas-Cap Drive Straight-Line Solution Converged:</strong> From the Havlena–Odeh linear regression (<span class="font-mono font-semibold">R² = ${r.r2.toFixed(4)}</span>), initial oil in place is <span class="font-mono font-semibold">N = ${N_mmstb.toFixed(2)} MMSTB</span>, gas-cap volume ratio is <span class="font-mono font-semibold">m = ${m.toFixed(4)}</span>, and initial gas-cap gas in place is <span class="font-mono font-semibold">G = ${G_bscf.toFixed(2)} BSCF</span> (${G_mmscf.toLocaleString('en-US', { maximumFractionDigits: 1 })} MMSCF).`;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. RENDER INTERACTIVE PRODUCTION / PVT / MBE TABLE
+    // -------------------------------------------------------------------------
+    function syncParamInputs() {
+      const p = state.params;
+      document.getElementById('param-pi').value = p.pi;
+      document.getElementById('param-boi').value = p.Boi;
+      document.getElementById('param-bgi').value = p.Bgi;
+      document.getElementById('param-rsi').value = p.Rsi;
+      document.getElementById('param-swc').value = p.Swc;
+      document.getElementById('param-phi').value = p.phi;
+      document.getElementById('param-cw').value = p.Cw;
+      document.getElementById('param-cf').value = p.Cf;
+    }
+
+    function updateInitialParam(key, val) {
+      const num = parseFloat(val);
+      if (!Number.isFinite(num)) return;
+      state.params[key] = num;
+      recalculateAll();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('mbe-table-body');
+      tbody.innerHTML = '';
+
+      state.computedSteps.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = row.isInitialPoint
+          ? 'bg-slate-50/80 text-slate-400'
+          : row.include
+            ? 'hover:bg-teal-50/30 transition-colors'
+            : 'bg-slate-50/50 text-slate-400 line-through';
+
+        const xStr = row.X !== null && Number.isFinite(row.X) ? row.X.toFixed(4) : '—';
+        const yStr = row.Y !== null && Number.isFinite(row.Y) ? row.Y.toFixed(2) : '—';
+
+        tr.innerHTML = `
+          <td class="py-2 px-2 text-center">
+            <input type="checkbox" ${row.include ? 'checked' : ''} ${row.isInitialPoint ? 'disabled title="Initial condition (Np=0) excluded from division"' : ''}
+              onchange="toggleRowInclude(${idx}, this.checked)"
+              class="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 cursor-pointer disabled:opacity-30" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.P}" onchange="updateRowCell(${idx}, 'P', this.value)"
+              class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.Rs}" onchange="updateRowCell(${idx}, 'Rs', this.value)"
+              class="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.Bo}" onchange="updateRowCell(${idx}, 'Bo', this.value)"
+              class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.Bg}" onchange="updateRowCell(${idx}, 'Bg', this.value)"
+              class="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.Np}" onchange="updateRowCell(${idx}, 'Np', this.value)"
+              class="w-20 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-1.5 px-1.5">
+            <input type="number" step="any" value="${row.Gp}" onchange="updateRowCell(${idx}, 'Gp', this.value)"
+              class="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 focus:border-teal-500 focus:outline-none" />
+          </td>
+          <td class="py-2 px-2 text-right font-semibold text-teal-800">${row.F_mmrb.toFixed(2)}</td>
+          <td class="py-2 px-2 text-right text-slate-700">${xStr}</td>
+          <td class="py-2 px-2 text-right font-semibold text-indigo-800">${yStr}</td>
+          <td class="py-2 px-1 text-center">
+            <button onclick="deleteTableRow(${idx})" class="text-slate-400 hover:text-rose-600 p-1 transition cursor-pointer" title="Delete row">
+              <i class="fa-solid fa-trash-can text-[11px]"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function toggleRowInclude(idx, checked) {
+      state.rows[idx].include = checked;
+      recalculateAll();
+    }
+
+    function selectAllRows(flag) {
+      state.rows.forEach((r) => {
+        if (r.Np > 0 && Math.abs(r.P - state.params.pi) > 1e-9) {
+          r.include = flag;
+        }
+      });
+      recalculateAll();
+    }
+
+    function updateRowCell(idx, field, val) {
+      const num = parseFloat(val);
+      if (!Number.isFinite(num)) return;
+      state.rows[idx][field] = num;
+      if (state.rows[idx].Np > 0 && Math.abs(state.rows[idx].P - state.params.pi) > 1e-9) {
+        state.rows[idx].include = true;
+      }
+      recalculateAll();
+    }
+
+    function addTableRow() {
+      const last = state.rows[state.rows.length - 1] || { P: 2250, Rs: 330, Bo: 1.17, Bg: 0.0071, Np: 20, Gp: 28 };
+      state.rows.push({
+        id: Date.now(),
+        include: true,
+        P: Math.max(100, last.P - 150),
+        Rs: Math.max(0, last.Rs - 20),
+        Bo: Number((last.Bo - 0.01).toFixed(4)),
+        Bg: Number((last.Bg + 0.0004).toFixed(6)),
+        Np: Number((last.Np + 3.0).toFixed(3)),
+        Gp: Number((last.Gp + 4.5).toFixed(3)),
+      });
+      recalculateAll();
+    }
+
+    function deleteTableRow(idx) {
+      if (state.rows.length <= 2) {
+        showToast('At least 2 rows must remain in the table.', 'warning');
+        return;
+      }
+      state.rows.splice(idx, 1);
+      recalculateAll();
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. INTERACTIVE SCIENTIFIC PLOTS (Plotly.js)
+    // -------------------------------------------------------------------------
+    function updatePlots() {
+      const r = state.regression;
+      const activeSteps = state.computedSteps.filter(
+        (s) => s.include && !s.isInitialPoint && s.X !== null && s.Y !== null && Number.isFinite(s.X) && Number.isFinite(s.Y)
+      );
+      const excludedSteps = state.computedSteps.filter(
+        (s) => !s.include && !s.isInitialPoint && s.X !== null && s.Y !== null && Number.isFinite(s.X) && Number.isFinite(s.Y)
+      );
+
+      // Axis labels based on mode
+      let xLabel = '(Eg + Efw) / (Eo + Efw)  [dimensionless]';
+      let yLabel = 'F / (Eo + Efw)  [MMSTB]';
+      let chartTitle = 'Havlena–Odeh Straight-Line Plot: F/(Eo+Efw) vs. (Eg+Efw)/(Eo+Efw)';
+      let chartSub = 'Y-Intercept = N (MMSTB)  |  Slope = m · N (MMSTB)';
+
+      if (r.mode === 'classic') {
+        xLabel = 'Eg / Eo  [dimensionless]';
+        yLabel = 'F / Eo  [MMSTB]';
+        chartTitle = 'Havlena–Odeh Straight-Line Plot (Neglecting Efw): F/Eo vs. Eg/Eo';
+      } else if (r.mode === 'undersaturated') {
+        xLabel = 'Total Expansion Eo + Efw  [rb/STB]';
+        yLabel = 'Underground Withdrawal F  [MMrb]';
+        chartTitle = 'Volumetric Drive Straight-Line Plot: F vs. (Eo + Efw)';
+        chartSub = 'Slope through Origin = N (MMSTB)  |  m = 0';
+      }
+
+      document.getElementById('chart1-title').textContent = chartTitle;
+      document.getElementById('chart1-subtitle').textContent = chartSub;
+
+      // ---- PLOT 1: Havlena-Odeh Straight Line ----
+      const traces1 = [
+        {
+          x: activeSteps.map((s) => s.X),
+          y: activeSteps.map((s) => s.Y),
+          text: activeSteps.map((s) => `P = ${s.P} psia<br>X = ${s.X.toFixed(4)}<br>Y = ${s.Y.toFixed(2)} MMSTB`),
+          hoverinfo: 'text',
+          mode: 'markers+text',
+          textposition: 'top center',
+          textfont: { family: 'JetBrains Mono, monospace', size: 10, color: '#334155' },
+          type: 'scatter',
+          name: 'Included Pressure Steps',
+          marker: { color: '#0d9488', size: 10, line: { color: '#0f766e', width: 1.5 } },
+        },
+      ];
+
+      // Add pressure labels to markers cleanly
+      traces1[0].texttemplate = activeSteps.map((s) => `${s.P}`);
+
+      if (excludedSteps.length > 0) {
+        traces1.push({
+          x: excludedSteps.map((s) => s.X),
+          y: excludedSteps.map((s) => s.Y),
+          text: excludedSteps.map((s) => `Excluded: P = ${s.P} psia<br>X = ${s.X.toFixed(4)}<br>Y = ${s.Y.toFixed(2)}`),
+          hoverinfo: 'text',
+          mode: 'markers',
+          type: 'scatter',
+          name: 'Excluded Steps',
+          marker: { color: '#94a3b8', size: 9, symbol: 'x' },
+        });
+      }
+
+      const annotations1 = [];
+      if (activeSteps.length >= 2) {
+        const xs = activeSteps.map((s) => s.X);
+        const minX = 0;
+        const maxX = Math.max(...xs) * 1.08;
+        const y0 = r.intercept + r.slope * minX;
+        const y1 = r.intercept + r.slope * maxX;
+
+        traces1.push({
+          x: [minX, maxX],
+          y: [y0, y1],
+          mode: 'lines',
+          type: 'scatter',
+          name: `OLS Fit (R² = ${r.r2.toFixed(4)})`,
+          line: { color: '#d97706', width: 2.5, dash: 'dash' },
+          hoverinfo: 'skip',
+        });
+
+        // Highlight Y-intercept point (0, N) when in gas-cap modes
+        if (r.mode !== 'undersaturated') {
+          traces1.push({
+            x: [0],
+            y: [r.intercept],
+            mode: 'markers',
+            type: 'scatter',
+            name: `Intercept N = ${r.N_mmstb.toFixed(2)} MMSTB`,
+            marker: { color: '#d97706', size: 11, symbol: 'diamond', line: { color: '#ffffff', width: 1.5 } },
+            hovertemplate: `Y-Intercept (X = 0)<br>N = ${r.N_mmstb.toFixed(2)} MMSTB<extra></extra>`,
+          });
+
+          const sign = r.intercept >= 0 ? '+' : '−';
+          annotations1.push({
+            x: maxX * 0.52,
+            y: r.intercept + r.slope * (maxX * 0.52),
+            text: `<b>Y = ${r.slope.toFixed(2)}X ${sign} ${Math.abs(r.intercept).toFixed(2)}</b><br>N = ${r.N_mmstb.toFixed(2)} MMSTB | m = ${r.m_ratio.toFixed(4)} | R² = ${r.r2.toFixed(4)}`,
+            showarrow: true,
+            arrowhead: 2,
+            ax: 0,
+            ay: -42,
+            bgcolor: 'rgba(255, 251, 235, 0.95)',
+            bordercolor: '#f59e0b',
+            borderwidth: 1,
+            borderpad: 6,
+            font: { family: 'JetBrains Mono, monospace', size: 10.5, color: '#78350f' },
+          });
+        }
+      }
+
+      const layout1 = {
+        margin: { l: 62, r: 22, t: 32, b: 50 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#f8fafc',
+        font: { family: 'Inter, sans-serif', size: 11, color: '#334155' },
+        legend: { orientation: 'h', y: 1.13, x: 0, font: { size: 10.5 } },
+        xaxis: {
+          title: { text: xLabel, font: { size: 11, weight: 600 } },
+          gridcolor: '#e2e8f0',
+          zerolinecolor: '#94a3b8',
+          rangemode: 'tozero',
+        },
+        yaxis: {
+          title: { text: yLabel, font: { size: 11, weight: 600 } },
+          gridcolor: '#e2e8f0',
+          zerolinecolor: '#94a3b8',
+          rangemode: 'tozero',
+        },
+        annotations: annotations1,
+      };
+
+      Plotly.react('havlenaPlot', traces1, layout1, { responsive: true, displayModeBar: false });
+
+      // ---- PLOT 2: Diagnostic F vs Total Expansion Et ----
+      const validDiag = state.computedSteps.filter((s) => s.include || s.isInitialPoint);
+      const maxEt = Math.max(0.01, ...validDiag.map((s) => s.Et));
+
+      const traces2 = [
+        {
+          x: validDiag.map((s) => s.Et),
+          y: validDiag.map((s) => s.F_mmrb),
+          text: validDiag.map((s) => `P = ${s.P} psia<br>Et = ${s.Et.toFixed(4)} rb/STB<br>F = ${s.F_mmrb.toFixed(2)} MMrb`),
+          hoverinfo: 'text',
+          mode: 'markers',
+          type: 'scatter',
+          name: 'F vs. Et',
+          marker: { color: '#4f46e5', size: 7.5 },
+        },
+        {
+          x: [0, maxEt * 1.05],
+          y: [0, Math.max(0, r.N_mmstb) * maxEt * 1.05],
+          mode: 'lines',
+          type: 'scatter',
+          name: `Slope N = ${r.N_mmstb.toFixed(2)} MMSTB`,
+          line: { color: '#0d9488', width: 2 },
+          hoverinfo: 'skip',
+        },
+      ];
+
+      const layout2 = {
+        margin: { l: 55, r: 16, t: 26, b: 40 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#f8fafc',
+        font: { family: 'Inter, sans-serif', size: 10, color: '#334155' },
+        legend: { orientation: 'h', y: 1.18, x: 0, font: { size: 9.5 } },
+        xaxis: {
+          title: { text: 'Total Expansion Et (rb/STB)', font: { size: 10 } },
+          gridcolor: '#e2e8f0',
+          rangemode: 'tozero',
+        },
+        yaxis: {
+          title: { text: 'F (MMrb)', font: { size: 10 } },
+          gridcolor: '#e2e8f0',
+          rangemode: 'tozero',
+        },
+      };
+
+      Plotly.react('diagnosticPlot', traces2, layout2, { responsive: true, displayModeBar: false });
+
+      // ---- PLOT 3: Pressure & Cumulative Production ----
+      const npUnit = document.getElementById('unit-np').value;
+      const gpUnit = document.getElementById('unit-gp').value;
+
+      const traces3 = [
+        {
+          x: state.rows.map((s) => s.P),
+          y: state.rows.map((s) => s.Np),
+          mode: 'lines+markers',
+          type: 'scatter',
+          name: `Np (${npUnit})`,
+          line: { color: '#0d9488', width: 2 },
+          marker: { size: 6 },
+          yaxis: 'y',
+        },
+        {
+          x: state.rows.map((s) => s.P),
+          y: state.rows.map((s) => s.Gp),
+          mode: 'lines+markers',
+          type: 'scatter',
+          name: `Gp (${gpUnit})`,
+          line: { color: '#d97706', width: 2, dash: 'dot' },
+          marker: { size: 6 },
+          yaxis: 'y2',
+        },
+      ];
+
+      const layout3 = {
+        margin: { l: 50, r: 52, t: 26, b: 40 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: '#f8fafc',
+        font: { family: 'Inter, sans-serif', size: 10, color: '#334155' },
+        legend: { orientation: 'h', y: 1.18, x: 0, font: { size: 9.5 } },
+        xaxis: {
+          title: { text: 'Reservoir Pressure P (psia)', font: { size: 10 } },
+          autorange: 'reversed',
+          gridcolor: '#e2e8f0',
+        },
+        yaxis: {
+          title: { text: `Np (${npUnit})`, font: { size: 10, color: '#0f766e' } },
+          gridcolor: '#e2e8f0',
+          rangemode: 'tozero',
+        },
+        yaxis2: {
+          title: { text: `Gp (${gpUnit})`, font: { size: 10, color: '#b45309' } },
+          overlaying: 'y',
+          side: 'right',
+          showgrid: false,
+          rangemode: 'tozero',
+        },
+      };
+
+      Plotly.react('historyPlot', traces3, layout3, { responsive: true, displayModeBar: false });
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. EXCEL (.XLSX / .XLS / .CSV) PARSING & TEMPLATE EXPORT
+    // -------------------------------------------------------------------------
+    function normalizeHeader(str) {
+      return String(str || '')
+        .toLowerCase()
+        .replace(/\(.*?\)/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    }
+
+    function detectUnitsFromHeaders(headers) {
+      const joined = headers.map((h) => String(h || '').toLowerCase()).join(' | ');
+      if (joined.includes('stb)') && !joined.includes('mmstb')) {
+        document.getElementById('unit-np').value = 'STB';
+      } else if (joined.includes('mmstb')) {
+        document.getElementById('unit-np').value = 'MMSTB';
+      }
+
+      if (joined.includes('mmmscf') || joined.includes('bscf')) {
+        document.getElementById('unit-gp').value = 'MMMSCF';
+      } else if (joined.includes('scf)') && !joined.includes('mmscf')) {
+        document.getElementById('unit-gp').value = 'SCF';
+      } else if (joined.includes('mmscf')) {
+        document.getElementById('unit-gp').value = 'MMSCF';
+      }
+
+      if (joined.includes('cuft/scf') || joined.includes('ft3/scf')) {
+        document.getElementById('unit-bg').value = 'cuft/SCF';
+      } else if (joined.includes('rb/stb') || joined.includes('rb/scf')) {
+        document.getElementById('unit-bg').value = 'rb/STB';
+      }
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            throw new Error('The uploaded workbook contains no sheets.');
+          }
+
+          // Sheet 1: Production & PVT Data
+          const sheet1Name = workbook.SheetNames[0];
+          const sheet1Rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheet1Name], { defval: null });
+
+          if (sheet1Rows.length === 0) {
+            throw new Error(`Sheet "${sheet1Name}" is empty.`);
+          }
+
+          const rawHeaders = Object.keys(sheet1Rows[0]);
+          detectUnitsFromHeaders(rawHeaders);
+
+          const parsedRows = [];
+          sheet1Rows.forEach((r, idx) => {
+            const mapped = {};
+            for (const [k, v] of Object.entries(r)) {
+              const nk = normalizeHeader(k);
+              const numVal = parseFloat(v);
+              if (nk === 'p' || nk === 'pressure' || nk === 'pres' || nk === 'avgreservoirpressure') mapped.P = numVal;
+              else if (nk === 'rs' || nk === 'solutiongor' || nk === 'gor') mapped.Rs = numVal;
+              else if (nk === 'bo' || nk === 'oilfvf') mapped.Bo = numVal;
+              else if (nk === 'bg' || nk === 'gasfvf') mapped.Bg = numVal;
+              else if (nk === 'np' || nk === 'cumoil' || nk === 'cumulativeoil' || nk === 'cumulativeoilproduced') mapped.Np = numVal;
+              else if (nk === 'gp' || nk === 'cumgas' || nk === 'cumulativegas' || nk === 'cumulativegasproduced') mapped.Gp = numVal;
+            }
+
+            if (Number.isFinite(mapped.P) && Number.isFinite(mapped.Bo) && Number.isFinite(mapped.Np)) {
+              parsedRows.push({
+                id: idx + 1,
+                include: mapped.Np > 0,
+                P: mapped.P,
+                Rs: Number.isFinite(mapped.Rs) ? mapped.Rs : 0,
+                Bo: mapped.Bo,
+                Bg: Number.isFinite(mapped.Bg) ? mapped.Bg : 0.001,
+                Np: mapped.Np,
+                Gp: Number.isFinite(mapped.Gp) ? mapped.Gp : 0,
+              });
+            }
+          });
+
+          if (parsedRows.length < 2) {
+            throw new Error('Could not find at least 2 valid rows with columns P, Rs, Bo, Bg, Np, Gp.');
+          }
+
+          // Sheet 2 (or fallback to first row of Sheet 1): Initial Reservoir Parameters
+          const newParams = { pi: 0, Boi: 0, Bgi: 0, Rsi: 0, Swc: 0, Cw: 0, Cf: 0, phi: 0.20 };
+          const zeroRow = parsedRows.find((r) => r.Np === 0) || parsedRows[0];
+          if (zeroRow) {
+            newParams.pi = zeroRow.P;
+            newParams.Boi = zeroRow.Bo;
+            newParams.Bgi = zeroRow.Bg;
+            newParams.Rsi = zeroRow.Rs;
+          }
+
+          if (workbook.SheetNames.length >= 2) {
+            const sheet2Name = workbook.SheetNames[1];
+            const sheet2Matrix = XLSX.utils.sheet_to_json(workbook.Sheets[sheet2Name], { header: 1, defval: null });
+
+            for (const rowArr of sheet2Matrix) {
+              if (!rowArr || rowArr.length < 2) continue;
+              const keyNorm = normalizeHeader(rowArr[0]);
+              const valNum = parseFloat(rowArr[1]);
+              if (!Number.isFinite(valNum)) continue;
+
+              if (keyNorm === 'pi' || keyNorm.includes('initialpressure')) newParams.pi = valNum;
+              else if (keyNorm === 'boi' || keyNorm.includes('initialoilfvf')) newParams.Boi = valNum;
+              else if (keyNorm === 'bgi' || keyNorm.includes('initialgasfvf')) newParams.Bgi = valNum;
+              else if (keyNorm === 'rsi' || keyNorm.includes('initialsolutiongor') || keyNorm.includes('initialgor')) newParams.Rsi = valNum;
+              else if (keyNorm === 'swc' || keyNorm.includes('connatewater')) newParams.Swc = valNum;
+              else if (keyNorm === 'cw' || keyNorm.includes('watercompressibility')) newParams.Cw = valNum;
+              else if (keyNorm === 'cf' || keyNorm.includes('formationcompressibility') || keyNorm.includes('rockcompressibility')) newParams.Cf = valNum;
+              else if (keyNorm === 'phi' || keyNorm.includes('porosity')) newParams.phi = valNum;
+            }
+          }
+
+          parsedRows.forEach((r) => {
+            if (r.Np <= 0 || Math.abs(r.P - newParams.pi) < 1e-9) {
+              r.include = false;
+            }
+          });
+
+          state.activeKey = 'CUSTOM';
+          state.datasetName = file.name;
+          state.params = newParams;
+          state.rows = parsedRows;
+
+          updatePresetButtonsUI();
+          document.getElementById('active-dataset-label').innerHTML =
+            `Loaded File: <span class="font-semibold text-teal-700">${file.name}</span> (${parsedRows.length} rows, $p_i = ${newParams.pi}\\text{ psia}$)`;
+
+          syncParamInputs();
+          recalculateAll();
+          showToast(`Successfully loaded <strong>${file.name}</strong> with ${parsedRows.length} pressure steps.`, 'success');
+        } catch (err) {
+          console.error(err);
+          showToast(`Excel Import Error: ${err.message}`, 'error');
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function downloadActiveExcel() {
+      try {
+        const wb = XLSX.utils.book_new();
+        const npUnit = document.getElementById('unit-np').value;
+        const gpUnit = document.getElementById('unit-gp').value;
+        const bgUnit = document.getElementById('unit-bg').value;
+
+        // Sheet 1: Production_PVT_Data
+        const prodData = state.rows.map((r) => ({
+          'P (psia)': r.P,
+          'Rs (SCF/STB)': r.Rs,
+          'Bo (rb/STB)': r.Bo,
+          [`Bg (${bgUnit})`]: r.Bg,
+          [`Np (${npUnit})`]: r.Np,
+          [`Gp (${gpUnit})`]: r.Gp,
+        }));
+        const ws1 = XLSX.utils.json_to_sheet(prodData);
+        ws1['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 16 }, { wch: 15 }, { wch: 16 }];
+        XLSX.utils.book_append_sheet(wb, ws1, 'Production_PVT_Data');
+
+        // Sheet 2: Initial_Parameters
+        const p = state.params;
+        const paramData = [
+          { Property: 'pi (psia)', Value: p.pi, Description: 'Initial reservoir pressure' },
+          { Property: 'Boi (rb/STB)', Value: p.Boi, Description: 'Initial oil formation volume factor' },
+          { Property: `Bgi (${bgUnit})`, Value: p.Bgi, Description: 'Initial gas formation volume factor' },
+          { Property: 'Rsi (SCF/STB)', Value: p.Rsi, Description: 'Initial solution gas-oil ratio' },
+          { Property: 'Swc (fraction)', Value: p.Swc, Description: 'Connate water saturation' },
+          { Property: 'Cw (psi^-1)', Value: p.Cw, Description: 'Water compressibility' },
+          { Property: 'Cf (psi^-1)', Value: p.Cf, Description: 'Formation (rock) compressibility' },
+          { Property: 'phi (fraction)', Value: p.phi, Description: 'Reservoir porosity' },
+        ];
+        const ws2 = XLSX.utils.json_to_sheet(paramData);
+        ws2['!cols'] = [{ wch: 18 }, { wch: 15 }, { wch: 36 }];
+        XLSX.utils.book_append_sheet(wb, ws2, 'Initial_Parameters');
+
+        const filename = state.activeKey === 'Q1'
+          ? 'PNGE4412_HW2_Q1_Havlena_Odeh_Input.xlsx'
+          : state.activeKey === 'Q2'
+            ? 'PNGE4412_HW2_Q2_Havlena_Odeh_Input.xlsx'
+            : 'Havlena_Odeh_Custom_Input.xlsx';
+
+        XLSX.writeFile(wb, filename);
+        showToast(`Downloaded 2-sheet Excel workbook: <strong>${filename}</strong>`, 'success');
+      } catch (err) {
+        showToast(`Failed to generate Excel workbook: ${err.message}`, 'error');
+      }
+    }
+
+    function exportResultsCSV() {
+      const r = state.regression;
+      const npUnit = document.getElementById('unit-np').value;
+      const gpUnit = document.getElementById('unit-gp').value;
+      const bgUnit = document.getElementById('unit-bg').value;
+
+      const lines = [
+        ['Havlena-Odeh Material Balance Analysis Report'],
+        ['Dataset', state.datasetName],
+        ['STOIIP N (MMSTB)', r.N_mmstb.toFixed(4)],
+        ['Gas-Cap Ratio m', r.m_ratio.toFixed(6)],
+        ['Gas-Cap Gas G (BSCF)', (r.G_scf / 1e9).toFixed(4)],
+        ['Gas-Cap Gas G (MMSCF)', (r.G_scf / 1e6).toFixed(2)],
+        ['R-Squared', r.r2.toFixed(6)],
+        [],
+        ['P (psia)', 'Rs (SCF/STB)', 'Bo (rb/STB)', `Bg (${bgUnit})`, `Np (${npUnit})`, `Gp (${gpUnit})`, 'Rp (SCF/STB)', 'F (MMrb)', 'Eo (rb/STB)', 'Eg (rb/STB)', 'Efw (rb/STB)', 'X-Axis', 'Y-Axis (MMSTB)', 'Included'],
+      ];
+
+      state.computedSteps.forEach((s) => {
+        lines.push([
+          s.P,
+          s.Rs,
+          s.Bo,
+          s.Bg,
+          s.Np,
+          s.Gp,
+          s.Rp.toFixed(2),
+          s.F_mmrb.toFixed(4),
+          s.Eo.toFixed(6),
+          s.Eg.toFixed(6),
+          s.Efw.toFixed(6),
+          s.X !== null ? s.X.toFixed(6) : '',
+          s.Y !== null ? s.Y.toFixed(4) : '',
+          s.include ? 'YES' : 'NO',
+        ]);
+      });
+
+      const csvContent = lines.map((row) => row.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Havlena_Odeh_${state.activeKey}_Results.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Exported Havlena–Odeh calculation table to CSV.', 'success');
+    }
+
+    // -------------------------------------------------------------------------
+    // 9. INITIALIZATION ON PAGE LOAD (Defaults to HW2 Question 1)
+    // -------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      loadPresetDataset('Q1', true);
+    });
+  </script>
+</body>
+</html>
